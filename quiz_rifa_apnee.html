@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz RIFA Apnée - Certification</title>
+    <meta name="description" content="Quiz interactif pour la certification RIFA Apnée - Réactions et Intervention Face à un Accident">
+    
+    <!-- React via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(180deg, #0a1628 0%, #0d2847 30%, #134b7a 60%, #1a6ba3 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        #root {
+            min-height: 100vh;
+        }
+        
+        /* Animations */
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1); opacity: 0.6; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(-110vh) scale(0.5); opacity: 0; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 200, 255, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(0, 200, 255, 0.6); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .bubble {
+            position: fixed;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), rgba(255,255,255,0.1));
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-out both;
+        }
+        
+        /* Scrollbar personnalisée */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #0a1628;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #134b7a;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #1a6ba3;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Données des questions avec catégorisation savoir-être / savoir-faire
+        const questionsData = [
+          {
+            id: 1,
+            question: "Quelle est la pression absolue subie par un apnéiste à 30 mètres de profondeur ?",
+            options: { A: "1 bar", B: "2 bars", C: "3 bars", D: "4 bars", E: "5 bars" },
+            answer: "D",
+            hint: "Pabs=Psurf+Peau",
+            justification: "À 30m, la pression hydrostatique est de 3 bars, auxquels s'ajoute le bar de pression atmosphérique de surface.",
+            category: "savoir-faire"
+          },
+          {
+            id: 2,
+            question: "Selon la loi de Mariotte, quel est le volume relatif d'air dans les poumons à 10m ?",
+            options: { A: "1/2 du volume initial", B: "1/3 du volume initial", C: "1/4 du volume initial", D: "Volume inchangé", E: "Volume doublé" },
+            answer: "A",
+            hint: "P×V=Constante",
+            justification: "À 10m, la pression double (2 bars), donc le volume d'air est réduit de moitié par rapport à la surface.",
+            category: "savoir-faire"
+          },
+          {
+            id: 3,
+            question: "Quel est le principal facteur déclenchant l'envie de respirer (rupture d'apnée) ?",
+            options: { A: "La baisse d'O2", B: "La hausse de CO2", C: "La pression de l'eau", D: "Le froid", E: "La fatigue musculaire" },
+            answer: "B",
+            hint: "C'est un déchet métabolique",
+            justification: "C'est l'élévation du taux de dioxyde de carbone qui envoie le signal de rupture au cerveau.",
+            category: "savoir-faire"
+          },
+          {
+            id: 4,
+            question: "Quel gaz est responsable du déclenchement d'une syncope hypoxique ?",
+            options: { A: "Le dioxyde de carbone", B: "L'azote", C: "L'oxygène (son manque)", D: "L'hélium", E: "Le monoxyde de carbone" },
+            answer: "C",
+            hint: "Manque de \"carburant\" cérébral",
+            justification: "La syncope survient lorsque la pression partielle d'oxygène chute sous un seuil critique pour le cerveau.",
+            category: "savoir-faire"
+          },
+          {
+            id: 5,
+            question: "Comment définit-on une PCM (Samba) ?",
+            options: { A: "Une perte de connaissance brève", B: "Des convulsions sans perte de conscience", C: "Un arrêt cardiaque", D: "Une douleur aux oreilles", E: "Une vision trouble" },
+            answer: "B",
+            hint: "Perte de Contrôle Moteur",
+            justification: "La PCM est une série de convulsions incontrôlables liée à une souffrance nerveuse, sans perte de conscience initiale.",
+            category: "savoir-etre"
+          },
+          {
+            id: 6,
+            question: "Quel organe protège-t-on en injectant de l'air dans le masque à la descente ?",
+            options: { A: "Les oreilles", B: "Les sinus", C: "Les poumons", D: "Les capillaires oculaires", E: "Le diaphragme" },
+            answer: "D",
+            hint: "Évite l'effet ventouse",
+            justification: "Équilibrer le masque évite la dépression qui provoquerait une rupture des capillaires de l'œil.",
+            category: "savoir-faire"
+          },
+          {
+            id: 7,
+            question: "Quel accident barotraumatique risque un apnéiste qui respire sur une bouteille au fond ?",
+            options: { A: "La syncope", B: "Le Taravana", C: "La surpression pulmonaire", D: "L'OPI", E: "La narcose" },
+            answer: "C",
+            hint: "L'air se dilate à la remontée",
+            justification: "L'air comprimé inhalé au fond augmente de volume à la remontée et peut déchirer les alvéoles si on bloque l'expiration.",
+            category: "savoir-etre"
+          },
+          {
+            id: 8,
+            question: "Quelle manœuvre d'équilibrage est formellement proscrite lors de la REMONTÉE ?",
+            options: { A: "Frenzel", B: "BTV", C: "Déglutition", D: "Valsalva", E: "Mouvements de mâchoire" },
+            answer: "D",
+            hint: "Risque de blocage d'air",
+            justification: "Le Valsalva augmente la pression interne et s'oppose à l'évacuation de l'air qui se dilate naturellement à la remontée.",
+            category: "savoir-faire"
+          },
+          {
+            id: 9,
+            question: "Quel est le symptôme caractéristique d'un Œdème Pulmonaire d'Immersion (OPI) ?",
+            options: { A: "Mal aux dents", B: "Mousse rosée aux lèvres et toux", C: "Douleur au genou", D: "Envie d'uriner", E: "Crampe au mollet" },
+            answer: "B",
+            hint: "Passage de liquide sanguin",
+            justification: "L'OPI est une intrusion de fluide plasmatique dans les alvéoles, causant une mousse rosée et une gêne respiratoire.",
+            category: "savoir-etre"
+          },
+          {
+            id: 10,
+            question: "Quelle est la première action de secours lors d'un sauvetage en immersion ?",
+            options: { A: "Ôter le masque", B: "Faire une RCP", C: "Appeler le CROSS", D: "Donner à boire", E: "Rejoindre et stabiliser la victime" },
+            answer: "E",
+            hint: "Empêcher la victime de couler",
+            justification: "La priorité absolue est de stopper la descente ou la dérive de la victime pour assurer sa survie immédiate.",
+            category: "savoir-faire"
+          },
+          {
+            id: 11,
+            question: "En surface, quelle est l'action prioritaire après avoir sécurisé les voies aériennes ?",
+            options: { A: "Retirer les palmes", B: "Faire un massage cardiaque", C: "Donner de l'oxygène", D: "Lui ôter son masque", E: "Appeler le 15" },
+            answer: "D",
+            hint: "Stimuler et libérer la face",
+            justification: "Ôter le masque permet de stimuler les récepteurs faciaux et de vérifier immédiatement la ventilation.",
+            category: "savoir-faire"
+          },
+          {
+            id: 12,
+            question: "Quelle technique de ventilation artificielle est recommandée lors d'une syncope en surface ?",
+            options: { A: "Bouche-à-bouche", B: "Bouche-à-nez", C: "Utilisation du BAVU", D: "Oxygénothérapie", E: "Massage cardiaque seul" },
+            answer: "B",
+            hint: "Spécificité du milieu aquatique",
+            justification: "Le \"bouche à nez\" est privilégié en surface car il facilite l'étanchéité et le maintien de la tête hors d'eau.",
+            category: "savoir-faire"
+          },
+          {
+            id: 13,
+            question: "Dans quelle position doit-on remorquer une victime pour garantir sa sécurité ?",
+            options: { A: "Face contre l'eau", B: "Voies aériennes hors de l'eau", C: "Verticalement", D: "Sous l'eau", E: "Sur le ventre" },
+            answer: "B",
+            hint: "Éviter l'inhalation d'eau",
+            justification: "Le sauveteur doit impérativement maintenir le nez et la bouche de la victime hors de l'eau pendant tout le trajet.",
+            category: "savoir-faire"
+          },
+          {
+            id: 14,
+            question: "Quelle technique de tractage offre la meilleure surveillance visuelle de la victime ?",
+            options: { A: "Tractage arrière", B: "Traction par les pieds", C: "Propulsion ventrale en poussant", D: "Remorquage par le bras", E: "Flottaison passive" },
+            answer: "C",
+            hint: "Confort et visibilité",
+            justification: "Pousser la victime placée devant ou à côté de soi permet de surveiller son visage en permanence.",
+            category: "savoir-faire"
+          },
+          {
+            id: 15,
+            question: "Comment appelle-t-on la technique d'hissage sur un boudin de bateau ?",
+            options: { A: "La balançoire", B: "Le \"bouchon\" (enfoncement bref)", C: "Le treuillage", D: "Le portage costal", E: "Le hissage dorsal" },
+            answer: "B",
+            hint: "Utilise l'inertie",
+            justification: "On enfonce brièvement la victime pour profiter de la poussée d'Archimède lors de la remontée hors de l'eau.",
+            category: "savoir-faire"
+          },
+          {
+            id: 16,
+            question: "Combien de temps doit-on mettre sous oxygène une victime d'une syncope ?",
+            options: { A: "2 minutes", B: "5 minutes", C: "10 minutes", D: "1 heure", E: "Jusqu'à l'arrivée des secours" },
+            answer: "C",
+            hint: "Protocole systématique",
+            justification: "Systématiquement après une syncope, la victime doit être placée une dizaine de minutes sous oxygène.",
+            category: "savoir-faire"
+          },
+          {
+            id: 17,
+            question: "Quel accident est suspecté si l'apnéiste a des douleurs thoraciques après la remontée ?",
+            options: { A: "Narcose", B: "Barotraumatisme des sinus", C: "Surpression pulmonaire", D: "Crampe", E: "Fatigue" },
+            answer: "C",
+            hint: "Lésion des tissus alvéolaires",
+            justification: "Une douleur rétrosternale ou thoracique après une apnée peut traduire une distension ou déchirure pulmonaire.",
+            category: "savoir-faire"
+          },
+          {
+            id: 18,
+            question: "Quelle est la conduite à tenir immédiate pour un barotraumatisme de l'oreille ?",
+            options: { A: "Continuer la plongée", B: "Sortir de l'eau et consulter un ORL", C: "Mettre des gouttes", D: "Replonger pour équilibrer", E: "Se moucher fort" },
+            answer: "B",
+            hint: "Arrêt de l'activité",
+            justification: "Toute lésion suspectée du tympan nécessite l'arrêt de l'immersion et un examen médical spécialisé.",
+            category: "savoir-faire"
+          },
+          {
+            id: 19,
+            question: "Que doit faire un apnéiste s'il ressent une douleur aux sinus à la descente ?",
+            options: { A: "Descendre plus vite", B: "Forcer le passage", C: "S'arrêter et remonter", D: "Enlever son masque", E: "Rien" },
+            answer: "C",
+            hint: "Dépression sinusale",
+            justification: "La douleur indique un blocage ; forcer risquerait de décoller la muqueuse sinusale.",
+            category: "savoir-faire"
+          },
+          {
+            id: 20,
+            question: "Quelle est la règle d'or n°6 concernant la préparation de l'apnée ?",
+            options: { A: "Hyperventiler 10 min", B: "Proscrire l'hyperventilation", C: "Boire de l'alcool", D: "Fumer", E: "Ne pas s'échauffer" },
+            answer: "B",
+            hint: "Sécurité vitale",
+            justification: "L'hyperventilation fausse les signaux d'alerte du CO2 et conduit à la syncope sans prévenir.",
+            category: "savoir-etre"
+          },
+          {
+            id: 21,
+            question: "Quel est le débit d'O2 recommandé pour l'administration continue d'oxygène pur ?",
+            options: { A: "5 L/min", B: "9 L/min", C: "12 L/min", D: "15 L/min", E: "25 L/min" },
+            answer: "D",
+            hint: "Concentration proche de 100%",
+            justification: "Le débit de 15 L/min est nécessaire pour assurer une inhalation d'O2 pur efficace chez l'accidenté.",
+            category: "savoir-faire"
+          },
+          {
+            id: 22,
+            question: "Quel matériel obligatoire permet de protéger une victime du froid ?",
+            options: { A: "Un pull", B: "Un drap", C: "Une couverture isothermique", D: "Une tente", E: "Une clim réversible" },
+            answer: "C",
+            hint: "Prévention de l'hypothermie",
+            justification: "La couverture isothermique est indispensable pour limiter la déperdition de chaleur de l'accidenté.",
+            category: "savoir-faire"
+          },
+          {
+            id: 23,
+            question: "Dans quel cas suspecte-t-on un accident de désaturation (Taravana) ?",
+            options: { A: "Après une seule apnée", B: "Apnées profondes répétées avec peu de récup", C: "Si l'eau est chaude", D: "En piscine", E: "Si le masque serre" },
+            answer: "B",
+            hint: "Accumulation d'azote",
+            justification: "Le Taravana survient lors d'apnées successives sans temps de récupération suffisant en surface.",
+            category: "savoir-etre"
+          },
+          {
+            id: 24,
+            question: "Que faire si une victime consciente présente une gêne respiratoire ?",
+            options: { A: "La mettre sur le ventre", B: "Retirer la combinaison et la mettre en position demi-assise", C: "La faire courir", D: "Retirer la combinaison et lui donner à boire et à manger", E: "L'allonger à plat" },
+            answer: "B",
+            hint: "Confort ventilatoire",
+            justification: "Cette position libère la cage thoracique et facilite le travail du diaphragme pour respirer.",
+            category: "savoir-faire"
+          },
+          {
+            id: 25,
+            question: "Quel geste est essentiel pour un syncopé en statique dès la sortie de l'eau ?",
+            options: { A: "Le secouer", B: "Le laisser dans l'eau", C: "Lui mettre le bras en protection", D: "Lui donner du sucre", E: "Le masser" },
+            answer: "C",
+            hint: "Sécurisation immédiate",
+            justification: "En sortie de statique, placer le bras en protection évite que la tête ne retombe dans l'eau lors de la reprise.",
+            category: "savoir-faire"
+          },
+          {
+            id: 26,
+            question: "Quel est le signe précurseur d'une syncope lors de l'immersion ?",
+            options: { A: "Palmage régulier", B: "Signal OK", C: "Remontée lente", D: "Regard fixe", E: "Lâcher de bulles ou gestes désordonnés" },
+            answer: "E",
+            hint: "Comportement anormal",
+            justification: "Tout changement brusque de rythme ou un lâcher de bulles trahit une perte de lucidité liée à l'hypoxie.",
+            category: "savoir-etre"
+          },
+          {
+            id: 27,
+            question: "Pourquoi ne pas porter de lunettes large de piscine en apnée verticale ?",
+            options: { A: "Pas esthétique", B: "Risque de placage oculaire grave", C: "L'eau entre dedans", D: "Elles tombent", E: "Mauvaise visibilité" },
+            answer: "B",
+            hint: "Pas d'équilibrage possible",
+            justification: "Contrairement au masque, on ne peut pas insuffler d'air dans des lunettes pour compenser la pression.",
+            category: "savoir-faire"
+          },
+          {
+            id: 28,
+            question: "Quel document remplir pour transmettre les informations aux secours ?",
+            options: { A: "Le carnet de plongée", B: "La licence", C: "La facture du club", D: "La fiche d'évacuation", E: "Un simple mot" },
+            answer: "D",
+            hint: "Historique et symptômes",
+            justification: "La fiche d'évacuation permet de transmettre l'état de la victime et les paramètres de l'apnée aux médecins.",
+            category: "savoir-faire"
+          },
+          {
+            id: 29,
+            question: "Quelle conduite à tenir pour une simple Samba (PCM) récupérée ?",
+            options: { A: "Sortir de l'eau et arrêt de l'activité", B: "Ignorer l'incident", C: "Replonger de suite", D: "Boire un café", E: "Faire un footing" },
+            answer: "A",
+            hint: "Surveillance indispensable",
+            justification: "Une PCM témoigne d'une souffrance cérébrale ; le repos et la sortie de l'eau sont impératifs.",
+            category: "savoir-faire"
+          },
+          {
+            id: 30,
+            question: "Comment prévient-on l'OPI chez un apnéiste profond ?",
+            options: { A: "Efforts violents", B: "Souplesse de la cage thoracique et progression", C: "Ne pas boire", D: "Descendre vite", E: "Utiliser des palmes carbones" },
+            answer: "B",
+            hint: "Adaptation physiologique",
+            justification: "Une cage thoracique souple encaisse mieux la pression sans léser la barrière alvéolo-capillaire.",
+            category: "savoir-etre"
+          },
+          {
+            id: 31,
+            question: "Quel facteur environnemental augmente le risque d'OPI ?",
+            options: { A: "L'eau très chaude", B: "Le soleil", C: "Les vagues", D: "Le courant faible", E: "L'eau très froide" },
+            answer: "E",
+            hint: "Facteur déclenchant",
+            justification: "Le froid provoque une vasoconstriction qui augmente la pression sanguine pulmonaire, favorisant l'OPI.",
+            category: "savoir-etre"
+          },
+          {
+            id: 32,
+            question: "En cas de collision avec un mur, quel signe doit alerter le sauveteur ?",
+            options: { A: "Étourdissement ou perte de connaissance", B: "Une égratignure", C: "Un bleu au bras", D: "Une soif intense", E: "Une faim de loup" },
+            answer: "A",
+            hint: "Choc traumatique",
+            justification: "Ces signes indiquent un traumatisme crânien ou une commotion nécessitant une surveillance.",
+            category: "savoir-etre"
+          },
+          {
+            id: 33,
+            question: "Quel est le pouvoir de conduction thermique de l'eau par rapport à l'air ?",
+            options: { A: "Identique", B: "10 fois supérieur", C: "90 à 150 fois supérieur", D: "5 fois inférieur", E: "2 fois supérieur" },
+            answer: "C",
+            hint: "Refroidissement rapide",
+            justification: "L'eau capte la chaleur du corps beaucoup plus vite que l'air, entraînant un risque d'hypothermie rapide.",
+            category: "savoir-etre"
+          },
+          {
+            id: 34,
+            question: "Quelle règle d'or n°3 concerne la surveillance réciproque ?",
+            options: { A: "Plonger chacun son tour", B: "Toujours garder un contact avec le binôme", C: "Plonger loin du groupe", D: "Changer de binôme souvent", E: "Ne pas se parler" },
+            answer: "B",
+            hint: "Contact permanent",
+            justification: "Le contact permanent permet d'intervenir dans les secondes qui suivent un incident.",
+            category: "savoir-etre"
+          },
+          {
+            id: 35,
+            question: "Quel est le rôle des poumons lors de l'apnée ?",
+            options: { A: "Produire de l'O2", B: "Filtrer l'eau", C: "Ne servent à rien", D: "Refroidir le sang", E: "Échanges gazeux via la barrière alvéolo-capillaire" },
+            answer: "E",
+            hint: "Physiologie respiratoire",
+            justification: "Les alvéoles permettent le passage de l'O2 vers le sang et l'évacuation du CO2 via les capillaires.",
+            category: "savoir-faire"
+          },
+          {
+            id: 36,
+            question: "À quoi sert le largage du lest de la victime lors d'un sauvetage ?",
+            options: { A: "Ranger le matériel", B: "Assurer une flottabilité positive immédiate", C: "Faire joli", D: "Punir la victime", E: "À rien" },
+            answer: "B",
+            hint: "Mise en sécurité",
+            justification: "Libérer le poids facilite la remontée et garantit que la victime reste en surface sans effort.",
+            category: "savoir-faire"
+          },
+          {
+            id: 37,
+            question: "Quels sont les signes avant-coureurs observables de l'hypoxie en surface ?",
+            options: { A: "Un sourire", B: "Un signal OK vigoureux", C: "Une discussion calme", D: "Lèvres bleues et regard vide", E: "Une respiration lente" },
+            answer: "D",
+            hint: "Signes d'émersion",
+            justification: "La cyanose (ongles/lèvres bleus) et le regard absent sont des signes de détresse imminente.",
+            category: "savoir-etre"
+          },
+          {
+            id: 38,
+            question: "Que faire si une victime a ingéré de l'eau mais semble consciente ?",
+            options: { A: "La laisser partir", B: "La faire courir", C: "Lui donner à manger", D: "Surveiller et médicaliser si toux persistante", E: "Rien du tout" },
+            answer: "D",
+            hint: "Inhalation suspectée",
+            justification: "L'ingestion d'eau peut entraîner des complications pulmonaires retardées graves (noyade secondaire).",
+            category: "savoir-faire"
+          },
+          {
+            id: 39,
+            question: "Quelle technique de sortie d'eau utilise les avant-bras sous les aisselles ?",
+            options: { A: "Le hissage vertical", B: "Le saut droit", C: "La balançoire", D: "La planche", E: "Le tractage à reculons sur une berge" },
+            answer: "E",
+            hint: "Sortie sur berge/plage",
+            justification: "Cette prise sécurise le haut du corps et permet au sauveteur de tirer la victime vers une zone sèche.",
+            category: "savoir-faire"
+          },
+          {
+            id: 40,
+            question: "Quel organe équilibre la pression entre le nez et l'oreille moyenne ?",
+            options: { A: "Le tympan", B: "Le conduit auditif", C: "La trompe d'Eustache", D: "La cochlée", E: "L'os temporal" },
+            answer: "C",
+            hint: "Équilibrage",
+            justification: "La trompe d'Eustache est le canal qui permet d'égaliser la pression de part et d'autre du tympan.",
+            category: "savoir-faire"
+          },
+          {
+            id: 41,
+            question: "Quelle est la conséquence d'une remontée avec les sinus bouchés ?",
+            options: { A: "Pression sur les tissus et douleur vive", B: "Aucune", C: "Ils explosent", D: "Ils se bouchent davantage", E: "Ils gèlent" },
+            answer: "A",
+            hint: "Barotraumatisme sinus",
+            justification: "L'air piégé augmente de volume et comprime la muqueuse contre les parois osseuses, créant une douleur.",
+            category: "savoir-etre"
+          },
+          {
+            id: 42,
+            question: "Pourquoi faut-il décoller régulièrement sa cagoule à la descente ?",
+            options: { A: "Pour mieux entendre", B: "Éviter une poche d'air plaquant le tympan", C: "Pour le style", D: "Faire entrer l'eau froide", E: "Ce n'est pas utile" },
+            answer: "B",
+            hint: "Baro oreille externe",
+            justification: "L'air comprimé sous la cagoule peut déformer ou léser le tympan par l'extérieur du conduit.",
+            category: "savoir-faire"
+          },
+          {
+            id: 43,
+            question: "Quel barotraumatisme peut survenir dès 1 mètre de fond en piscine ?",
+            options: { A: "La narcose", B: "Le Taravana", C: "L'OPI", D: "Une collision", E: "La surpression pulmonaire (si inspiration bouteille)" },
+            answer: "E",
+            hint: "Risque proportionnel",
+            justification: "La variation de volume d'air est proportionnellement plus importante près de la surface.",
+            category: "savoir-faire"
+          },
+          {
+            id: 44,
+            question: "Quel élément est essentiel pour rassurer la victime dès la prise en charge ?",
+            options: { A: "Un contact visuel permanent", B: "Lui faire un cadeau", C: "Crier très fort", D: "Rester silencieux", E: "Partir chercher de l'aide" },
+            answer: "A",
+            hint: "Communication sauveteur",
+            justification: "Le contact visuel maintient le lien de conscience et rassure l'accidenté sur sa prise en charge.",
+            category: "savoir-etre"
+          },
+          {
+            id: 45,
+            question: "Quelle règle d'or n°7 concerne la performance en apnée ?",
+            options: { A: "Aller toujours plus loin", B: "Maîtriser une performance avant de l'améliorer", C: "Ne pas s'entraîner", D: "Faire des paris", E: "Toujours forcer" },
+            answer: "B",
+            hint: "Progressivité",
+            justification: "La sécurité repose sur la consolidation des acquis avant toute tentative d'augmentation des paramètres.",
+            category: "savoir-etre"
+          },
+          {
+            id: 46,
+            question: "Que signifie \"PLS\" dans le cadre de la mise en sécurité ?",
+            options: { A: "Position de Liberté", B: "Premier Levier Secours", C: "Position de Lutte", D: "Position Latérale de Sécurité", E: "Protocole de Liaison" },
+            answer: "D",
+            hint: "Victime inconsciente",
+            justification: "On place la victime inconsciente qui respire sur le côté pour libérer les voies aériennes.",
+            category: "savoir-etre"
+          },
+          {
+            id: 47,
+            question: "Lors du tractage, où doit se trouver la bouche de la victime ?",
+            options: { A: "Sous l'eau", B: "Plus haut que celle du sauveteur", C: "Au même niveau", D: "Derrière le sauveteur", E: "N'importe où" },
+            answer: "B",
+            hint: "Prise arrière sécurité",
+            justification: "Dans une prise arrière, la bouche de la victime doit être maintenue au plus haut pour éviter l'eau.",
+            category: "savoir-faire"
+          },
+          {
+            id: 48,
+            question: "Dans quel cas applique-t-on la technique RCP ?",
+            options: { A: "Les habiller", B: "Un masque facial par élève et désinfection", C: "Utiliser du savon", D: "Ne pas souffler", E: "Utiliser des gants" },
+            answer: "B",
+            hint: "Asepsie",
+            justification: "Il faut nettoyer les masques et changer les voies respiratoires après chaque séance d'entraînement.",
+            category: "savoir-faire"
+          },
+          {
+            id: 49,
+            question: "Quel est le risque d'une insufflation manquant de vigueur en bouche-à-nez ?",
+            options: { A: "Aucun", B: "La victime se réveille", C: "L'air n'ouvre pas les voies aériennes et n'atteint pas les poumons", D: "Le sauveteur s'étouffe", E: "La victime vomit" },
+            answer: "C",
+            hint: "Efficacité ventilation",
+            justification: "Le cours RIFA-A stipule que l'apnéiste sauveteur est évalué non seulement sur sa rapidité, mais surtout sur la qualité des gestes de sauvetage.",
+            category: "savoir-faire"
+          },
+          {
+            id: 50,
+            question: "Pourquoi ne jamais faire d'apnée seul, même en piscine ?",
+            options: { A: "Pour discuter", B: "Pour partager un bon moment", C: "C'est interdit partout", D: "Pour payer moins cher", E: "Risque de noyade immédiate" },
+            answer: "E",
+            hint: "Règle d'or n°1",
+            justification: "La syncope est imprévisible et silencieuse ; seul un binôme peut assurer un sauvetage rapide et éviter une noyade.",
+            category: "savoir-etre"
+          }
+        ];
+
+        // Mélanger les questions
+        const shuffleArray = (array) => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+
+        // Composant Bulles
+        function Bubbles() {
+          const [bubbles] = useState(() => 
+            Array.from({ length: 20 }, (_, i) => ({
+              id: i,
+              left: Math.random() * 100,
+              size: Math.random() * 20 + 10,
+              duration: Math.random() * 10 + 10,
+              delay: Math.random() * 5
+            }))
+          );
+
+          return (
+            <>
+              {bubbles.map(bubble => (
+                <div
+                  key={bubble.id}
+                  className="bubble"
+                  style={{
+                    left: `${bubble.left}%`,
+                    bottom: '-50px',
+                    width: `${bubble.size}px`,
+                    height: `${bubble.size}px`,
+                    animation: `rise ${bubble.duration}s infinite ease-in`,
+                    animationDelay: `${bubble.delay}s`
+                  }}
+                />
+              ))}
+            </>
+          );
+        }
+
+        // Composant Principal
+        function QuizApnee() {
+          const [gameState, setGameState] = useState('intro');
+          const [questions, setQuestions] = useState([]);
+          const [currentIndex, setCurrentIndex] = useState(0);
+          const [selectedAnswer, setSelectedAnswer] = useState(null);
+          const [showResult, setShowResult] = useState(false);
+          const [hintUsed, setHintUsed] = useState(false);
+          const [showHint, setShowHint] = useState(false);
+          const [answers, setAnswers] = useState([]);
+
+          const startQuiz = () => {
+            setQuestions(shuffleArray(questionsData));
+            setCurrentIndex(0);
+            setSelectedAnswer(null);
+            setShowResult(false);
+            setHintUsed(false);
+            setShowHint(false);
+            setAnswers([]);
+            setGameState('quiz');
+          };
+
+          const handleHint = () => {
+            setShowHint(true);
+            setHintUsed(true);
+          };
+
+          const handleAnswer = (letter) => {
+            if (showResult) return;
+            setSelectedAnswer(letter);
+          };
+
+          const validateAnswer = () => {
+            if (!selectedAnswer) return;
+            
+            const currentQuestion = questions[currentIndex];
+            const isCorrect = selectedAnswer === currentQuestion.answer;
+            const points = isCorrect ? (hintUsed ? 1 : 2) : 0;
+            
+            setAnswers([...answers, {
+              questionId: currentQuestion.id,
+              selected: selectedAnswer,
+              correct: currentQuestion.answer,
+              isCorrect,
+              points,
+              hintUsed,
+              category: currentQuestion.category
+            }]);
+            
+            setShowResult(true);
+          };
+
+          const nextQuestion = () => {
+            if (currentIndex < questions.length - 1) {
+              setCurrentIndex(currentIndex + 1);
+              setSelectedAnswer(null);
+              setShowResult(false);
+              setHintUsed(false);
+              setShowHint(false);
+            } else {
+              setGameState('results');
+            }
+          };
+
+          const calculateResults = () => {
+            const totalPoints = answers.reduce((sum, a) => sum + a.points, 0);
+            const maxPoints = questions.length * 2;
+            const percentage = Math.round((totalPoints / maxPoints) * 100);
+            
+            const savoirEtre = answers.filter(a => {
+              const q = questionsData.find(q => q.id === a.questionId);
+              return q?.category === 'savoir-etre';
+            });
+            const savoirFaire = answers.filter(a => {
+              const q = questionsData.find(q => q.id === a.questionId);
+              return q?.category === 'savoir-faire';
+            });
+
+            const savoirEtreCorrect = savoirEtre.filter(a => a.isCorrect).length;
+            const savoirFaireCorrect = savoirFaire.filter(a => a.isCorrect).length;
+            
+            const savoirEtreScore = savoirEtre.length > 0 
+              ? Math.round((savoirEtreCorrect / savoirEtre.length) * 100) 
+              : 0;
+            const savoirFaireScore = savoirFaire.length > 0 
+              ? Math.round((savoirFaireCorrect / savoirFaire.length) * 100) 
+              : 0;
+
+            return {
+              totalPoints,
+              maxPoints,
+              percentage,
+              certified: percentage >= 80,
+              savoirEtre: { total: savoirEtre.length, correct: savoirEtreCorrect, score: savoirEtreScore },
+              savoirFaire: { total: savoirFaire.length, correct: savoirFaireCorrect, score: savoirFaireScore },
+              correctAnswers: answers.filter(a => a.isCorrect).length,
+              wrongAnswers: answers.filter(a => !a.isCorrect).length,
+              hintsUsed: answers.filter(a => a.hintUsed).length
+            };
+          };
+
+          const currentQuestion = questions[currentIndex];
+
+          // Styles communs
+          const styles = {
+            container: {
+              minHeight: '100vh',
+              position: 'relative',
+              zIndex: 10
+            },
+            card: {
+              background: 'rgba(255,255,255,0.03)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              padding: 'clamp(20px, 4vw, 40px)',
+              border: '1px solid rgba(255,255,255,0.1)'
+            },
+            button: {
+              background: 'linear-gradient(135deg, #00d4ff 0%, #0099cc 100%)',
+              color: '#fff',
+              border: 'none',
+              padding: '18px 60px',
+              fontSize: '1.2rem',
+              borderRadius: '50px',
+              cursor: 'pointer',
+              fontWeight: '500',
+              letterSpacing: '2px',
+              textTransform: 'uppercase',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 10px 30px rgba(0, 200, 255, 0.3)'
+            },
+            buttonDisabled: {
+              background: 'rgba(255,255,255,0.1)',
+              color: 'rgba(255,255,255,0.4)',
+              cursor: 'not-allowed',
+              boxShadow: 'none'
+            }
+          };
+
+          return (
+            <div style={styles.container}>
+              <Bubbles />
+
+              {/* Écran d'introduction */}
+              {gameState === 'intro' && (
+                <div style={{
+                  minHeight: '100vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px'
+                }}>
+                  <div className="fade-in" style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '80px', marginBottom: '20px' }}>🤿</div>
+                    <h1 style={{
+                      fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                      color: '#fff',
+                      textShadow: '0 0 30px rgba(0, 200, 255, 0.5)',
+                      marginBottom: '10px',
+                      fontWeight: '300',
+                      letterSpacing: '3px'
+                    }}>QUIZ RIFA APNÉE</h1>
+                    <p style={{
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: '1.1rem',
+                      marginBottom: '40px',
+                      fontWeight: '300'
+                    }}>Réactions et Intervention Face à un Accident</p>
+
+                    <div style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      backdropFilter: 'blur(10px)',
+                      borderRadius: '20px',
+                      padding: '30px',
+                      maxWidth: '500px',
+                      margin: '0 auto 40px',
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                      <h3 style={{ color: '#00d4ff', marginBottom: '20px', fontWeight: '400' }}>📋 Règles du Quiz</h3>
+                      <div style={{ textAlign: 'left', color: 'rgba(255,255,255,0.8)', lineHeight: '1.8' }}>
+                        <p>✓ <strong style={{color: '#4ade80'}}>50 questions</strong> à choix unique</p>
+                        <p>✓ Réponse correcte : <strong style={{color: '#4ade80'}}>2 points</strong></p>
+                        <p>✓ Avec indice : <strong style={{color: '#facc15'}}>1 point</strong></p>
+                        <p>✓ Mauvaise réponse : <strong style={{color: '#f87171'}}>0 point</strong></p>
+                        <p style={{marginTop: '15px', padding: '10px', background: 'rgba(0,200,255,0.1)', borderRadius: '10px'}}>
+                          🎯 Certification : <strong style={{color: '#00d4ff'}}>≥ 80%</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={startQuiz}
+                      style={styles.button}
+                      onMouseOver={e => e.target.style.transform = 'translateY(-3px)'}
+                      onMouseOut={e => e.target.style.transform = 'translateY(0)'}
+                    >
+                      Commencer le Quiz
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Écran du quiz */}
+              {gameState === 'quiz' && currentQuestion && (
+                <div style={{ minHeight: '100vh', padding: '20px' }}>
+                  {/* Barre de progression */}
+                  <div style={{ maxWidth: '900px', margin: '0 auto 20px', padding: '0 20px' }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '10px',
+                      color: 'rgba(255,255,255,0.7)'
+                    }}>
+                      <span>Question {currentIndex + 1} / {questions.length}</span>
+                      <span style={{ color: '#00d4ff' }}>
+                        {answers.reduce((sum, a) => sum + a.points, 0)} pts
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '6px',
+                      background: 'rgba(255,255,255,0.1)',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                        background: 'linear-gradient(90deg, #00d4ff, #00ff88)',
+                        borderRadius: '3px',
+                        transition: 'width 0.5s ease'
+                      }} />
+                    </div>
+                  </div>
+
+                  {/* Carte de question */}
+                  <div className="fade-in" style={{ ...styles.card, maxWidth: '900px', margin: '0 auto' }}>
+                    {/* En-tête */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <span style={{
+                        background: 'linear-gradient(135deg, #00d4ff, #0099cc)',
+                        color: '#fff',
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}>Q{currentQuestion.id}</span>
+                      <span style={{
+                        background: currentQuestion.category === 'savoir-etre' 
+                          ? 'rgba(168, 85, 247, 0.2)' 
+                          : 'rgba(34, 197, 94, 0.2)',
+                        color: currentQuestion.category === 'savoir-etre' 
+                          ? '#c084fc' 
+                          : '#4ade80',
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
+                      }}>
+                        {currentQuestion.category === 'savoir-etre' ? '🧠 Savoir-être' : '🔧 Savoir-faire'}
+                      </span>
+                    </div>
+
+                    {/* Question */}
+                    <h2 style={{
+                      color: '#fff',
+                      fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
+                      fontWeight: '400',
+                      lineHeight: '1.6',
+                      marginBottom: '30px'
+                    }}>{currentQuestion.question}</h2>
+
+                    {/* Options */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {Object.entries(currentQuestion.options).map(([letter, text], idx) => {
+                        const isSelected = selectedAnswer === letter;
+                        const isCorrect = letter === currentQuestion.answer;
+                        const isWrong = showResult && isSelected && !isCorrect;
+                        const showCorrect = showResult && isCorrect;
+
+                        let bgColor = 'rgba(255,255,255,0.05)';
+                        let borderColor = 'rgba(255,255,255,0.1)';
+                        let textColor = 'rgba(255,255,255,0.9)';
+
+                        if (isSelected && !showResult) {
+                          bgColor = 'rgba(0, 212, 255, 0.15)';
+                          borderColor = '#00d4ff';
+                        }
+                        if (showCorrect) {
+                          bgColor = 'rgba(34, 197, 94, 0.2)';
+                          borderColor = '#22c55e';
+                          textColor = '#4ade80';
+                        }
+                        if (isWrong) {
+                          bgColor = 'rgba(239, 68, 68, 0.2)';
+                          borderColor = '#ef4444';
+                          textColor = '#f87171';
+                        }
+
+                        return (
+                          <button
+                            key={letter}
+                            onClick={() => handleAnswer(letter)}
+                            disabled={showResult}
+                            className="slide-in"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '15px',
+                              padding: '16px 20px',
+                              background: bgColor,
+                              border: `2px solid ${borderColor}`,
+                              borderRadius: '12px',
+                              cursor: showResult ? 'default' : 'pointer',
+                              transition: 'all 0.3s ease',
+                              textAlign: 'left',
+                              animationDelay: `${idx * 0.1}s`
+                            }}
+                          >
+                            <span style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: isSelected || showCorrect || isWrong 
+                                ? borderColor 
+                                : 'rgba(255,255,255,0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: '600',
+                              color: isSelected || showCorrect || isWrong ? '#fff' : 'rgba(255,255,255,0.6)',
+                              flexShrink: 0
+                            }}>
+                              {showCorrect ? '✓' : isWrong ? '✗' : letter}
+                            </span>
+                            <span style={{ color: textColor, fontSize: '1rem' }}>{text}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Justification en cas d'erreur */}
+                    {showResult && selectedAnswer !== currentQuestion.answer && (
+                      <div className="fade-in" style={{
+                        marginTop: '20px',
+                        padding: '20px',
+                        background: 'rgba(34, 197, 94, 0.1)',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        borderRadius: '12px'
+                      }}>
+                        <h4 style={{ color: '#4ade80', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>💡</span> Justification
+                        </h4>
+                        <p style={{ color: 'rgba(255,255,255,0.85)', lineHeight: '1.6' }}>
+                          {currentQuestion.justification}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Zone indice */}
+                    {!showResult && (
+                      <div style={{ marginTop: '25px' }}>
+                        {!showHint ? (
+                          <button
+                            onClick={handleHint}
+                            style={{
+                              background: 'rgba(250, 204, 21, 0.1)',
+                              border: '1px solid rgba(250, 204, 21, 0.3)',
+                              color: '#facc15',
+                              padding: '12px 24px',
+                              borderRadius: '10px',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              transition: 'all 0.3s ease'
+                            }}
+                          >
+                            💡 Voir l'indice (-1 point)
+                          </button>
+                        ) : (
+                          <div className="fade-in" style={{
+                            padding: '15px 20px',
+                            background: 'rgba(250, 204, 21, 0.1)',
+                            border: '1px solid rgba(250, 204, 21, 0.3)',
+                            borderRadius: '10px',
+                            color: '#facc15'
+                          }}>
+                            <strong>💡 Indice :</strong> {currentQuestion.hint}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Boutons d'action */}
+                    <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center', gap: '15px' }}>
+                      {!showResult ? (
+                        <button
+                          onClick={validateAnswer}
+                          disabled={!selectedAnswer}
+                          style={{
+                            ...styles.button,
+                            padding: '16px 50px',
+                            fontSize: '1rem',
+                            ...(selectedAnswer ? {} : styles.buttonDisabled)
+                          }}
+                        >
+                          Valider
+                        </button>
+                      ) : (
+                        <button
+                          onClick={nextQuestion}
+                          style={{ ...styles.button, padding: '16px 50px', fontSize: '1rem' }}
+                        >
+                          {currentIndex < questions.length - 1 ? 'Question suivante →' : 'Voir les résultats'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Écran des résultats */}
+              {gameState === 'results' && (
+                <div style={{ minHeight: '100vh', padding: '40px 20px' }}>
+                  {(() => {
+                    const results = calculateResults();
+                    return (
+                      <div className="fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+                        {/* En-tête résultat */}
+                        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                          <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+                            {results.certified ? '🏆' : '📚'}
+                          </div>
+                          <h1 style={{
+                            fontSize: 'clamp(2rem, 5vw, 3rem)',
+                            color: '#fff',
+                            marginBottom: '10px',
+                            fontWeight: '300'
+                          }}>
+                            {results.certified ? 'Félicitations !' : 'Continuez vos efforts !'}
+                          </h1>
+                          <p style={{
+                            color: results.certified ? '#4ade80' : '#facc15',
+                            fontSize: '1.2rem'
+                          }}>
+                            {results.certified 
+                              ? 'Vous avez obtenu votre certification RIFA Apnée' 
+                              : 'Vous n\'avez pas atteint le seuil de certification (80%)'}
+                          </p>
+                        </div>
+
+                        {/* Score principal */}
+                        <div style={{
+                          ...styles.card,
+                          textAlign: 'center',
+                          marginBottom: '30px'
+                        }}>
+                          <div style={{
+                            fontSize: 'clamp(4rem, 10vw, 6rem)',
+                            fontWeight: '200',
+                            color: results.certified ? '#4ade80' : '#facc15',
+                            textShadow: results.certified 
+                              ? '0 0 40px rgba(74, 222, 128, 0.5)' 
+                              : '0 0 40px rgba(250, 204, 21, 0.5)'
+                          }}>
+                            {results.percentage}%
+                          </div>
+                          <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: '10px' }}>
+                            {results.totalPoints} / {results.maxPoints} points
+                          </p>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            gap: '30px',
+                            marginTop: '20px',
+                            flexWrap: 'wrap'
+                          }}>
+                            <span style={{ color: '#4ade80' }}>✓ {results.correctAnswers} bonnes</span>
+                            <span style={{ color: '#f87171' }}>✗ {results.wrongAnswers} erreurs</span>
+                            <span style={{ color: '#facc15' }}>💡 {results.hintsUsed} indices</span>
+                          </div>
+                        </div>
+
+                        {/* Analyse Savoir-être / Savoir-faire */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                          gap: '20px',
+                          marginBottom: '30px'
+                        }}>
+                          {/* Savoir-être */}
+                          <div style={{
+                            background: 'rgba(168, 85, 247, 0.1)',
+                            backdropFilter: 'blur(20px)',
+                            borderRadius: '20px',
+                            padding: '30px',
+                            border: '1px solid rgba(168, 85, 247, 0.3)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                              <span style={{ fontSize: '24px' }}>🧠</span>
+                              <h3 style={{ color: '#c084fc', fontWeight: '400', margin: 0 }}>Savoir-être</h3>
+                            </div>
+                            <div style={{ fontSize: '3rem', fontWeight: '200', color: '#c084fc', marginBottom: '10px' }}>
+                              {results.savoirEtre.score}%
+                            </div>
+                            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+                              {results.savoirEtre.correct} / {results.savoirEtre.total} questions
+                            </p>
+                            <div style={{
+                              height: '6px',
+                              background: 'rgba(255,255,255,0.1)',
+                              borderRadius: '3px',
+                              marginTop: '15px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${results.savoirEtre.score}%`,
+                                background: 'linear-gradient(90deg, #a855f7, #c084fc)',
+                                borderRadius: '3px'
+                              }} />
+                            </div>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', marginTop: '15px', lineHeight: '1.5' }}>
+                              Vigilance, prévention, règles de sécurité, communication
+                            </p>
+                          </div>
+
+                          {/* Savoir-faire */}
+                          <div style={{
+                            background: 'rgba(34, 197, 94, 0.1)',
+                            backdropFilter: 'blur(20px)',
+                            borderRadius: '20px',
+                            padding: '30px',
+                            border: '1px solid rgba(34, 197, 94, 0.3)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                              <span style={{ fontSize: '24px' }}>🔧</span>
+                              <h3 style={{ color: '#4ade80', fontWeight: '400', margin: 0 }}>Savoir-faire</h3>
+                            </div>
+                            <div style={{ fontSize: '3rem', fontWeight: '200', color: '#4ade80', marginBottom: '10px' }}>
+                              {results.savoirFaire.score}%
+                            </div>
+                            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+                              {results.savoirFaire.correct} / {results.savoirFaire.total} questions
+                            </p>
+                            <div style={{
+                              height: '6px',
+                              background: 'rgba(255,255,255,0.1)',
+                              borderRadius: '3px',
+                              marginTop: '15px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${results.savoirFaire.score}%`,
+                                background: 'linear-gradient(90deg, #22c55e, #4ade80)',
+                                borderRadius: '3px'
+                              }} />
+                            </div>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', marginTop: '15px', lineHeight: '1.5' }}>
+                              Techniques, gestes de secours, procédures, connaissances
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Analyse détaillée */}
+                        <div style={{ ...styles.card, marginBottom: '30px' }}>
+                          <h3 style={{ color: '#00d4ff', marginBottom: '20px', fontWeight: '400' }}>
+                            📊 Analyse de vos compétences
+                          </h3>
+                          <div style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.8' }}>
+                            {results.savoirEtre.score >= 80 && results.savoirFaire.score >= 80 && (
+                              <p>✨ <strong>Excellent !</strong> Vous maîtrisez parfaitement les aspects théoriques et pratiques du sauvetage en apnée.</p>
+                            )}
+                            {results.savoirEtre.score < 80 && results.savoirFaire.score >= 80 && (
+                              <p>🎯 Vos <strong>compétences techniques</strong> sont solides. Travaillez davantage sur la <strong>vigilance</strong>, les <strong>règles de sécurité</strong> et la <strong>prévention des risques</strong>.</p>
+                            )}
+                            {results.savoirEtre.score >= 80 && results.savoirFaire.score < 80 && (
+                              <p>🎯 Votre <strong>attitude préventive</strong> est excellente. Renforcez vos <strong>connaissances techniques</strong> sur les <strong>gestes de secours</strong> et les <strong>procédures</strong>.</p>
+                            )}
+                            {results.savoirEtre.score < 80 && results.savoirFaire.score < 80 && (
+                              <p>📚 Continuez votre apprentissage ! Revoyez les <strong>règles d'or de l'apnée</strong>, les <strong>signes de détresse</strong> et les <strong>techniques de sauvetage</strong>.</p>
+                            )}
+                            {results.hintsUsed > 10 && (
+                              <p style={{ marginTop: '10px' }}>💡 Vous avez utilisé {results.hintsUsed} indices. Essayez de mémoriser ces points clés pour votre prochaine tentative.</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bouton recommencer */}
+                        <div style={{ textAlign: 'center' }}>
+                          <button
+                            onClick={startQuiz}
+                            style={styles.button}
+                            onMouseOver={e => e.target.style.transform = 'translateY(-3px)'}
+                            onMouseOut={e => e.target.style.transform = 'translateY(0)'}
+                          >
+                            🔄 Recommencer le Quiz
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Rendu de l'application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<QuizApnee />);
+    </script>
+</body>
+</html>
