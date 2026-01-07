@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    
+    <!-- Paramètres iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Suivi Apnée">
+    
+    <title>Suivi Apnée</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { 
+            touch-action: manipulation; 
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    <!-- Manifeste PWA -->
+    <script>
+        const manifest = {
+            "name": "Suivi Élèves Apnée",
+            "short_name": "Apnée",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f8fafc",
+            "theme_color": "#2563eb",
+            "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3048/3048379.png", "sizes": "512x512", "type": "image/png" }]
+        };
+        const content = encodeURIComponent(JSON.stringify(manifest));
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = 'data:application/manifest+json,' + content;
+        document.head.appendChild(link);
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 pb-24 select-none font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icônes ---
+        const Icon = ({ path, className = "w-6 h-6" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+
+        const Icons = {
+            Plus: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="M12 5v14"/></>} />,
+            Trash2: (props) => <Icon {...props} path={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>} />,
+            User: (props) => <Icon {...props} path={<><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />,
+            ChevronDown: (props) => <Icon {...props} path={<path d="m6 9 6 6 6-6"/>} />,
+            ChevronRight: (props) => <Icon {...props} path={<path d="m9 18 6-6-6-6"/>} />,
+            Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>} />,
+            Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+            Upload: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></>} />,
+            MessageSquare: (props) => <Icon {...props} path={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>} />
+        };
+
+        const ApneeTracker = () => {
+            const structure = [
+                { id: 'c1', title: 'C1 : Matériel', short: 'C1', icon: '🤿', criteria: [ { id: 'c1_connaissance', label: 'Connaissance matériel', sub: 'Choix et nom (PMT, combi, lest)' }, { id: 'c1_pmt', label: 'Utilisation PMT', sub: 'Efficace et en autonomie' }, { id: 'c1_lest', label: 'Gestion lestage', sub: 'Réglage seul, flottabilité neutre' }, { id: 'c1_aisance', label: 'Aisance', sub: 'Maîtrise buée, sangle sans aide' } ] },
+                { id: 'c2a', title: 'C2a : Surface', short: 'C2a', icon: '🌬️', criteria: [ { id: 'c2a_ventilation', label: 'Ventilation', sub: 'Abdominale et/ou thoracique' }, { id: 'c2a_prep', label: 'Préparation', sub: 'Relâchement et protocole' }, { id: 'c2a_securite', label: 'Sécurité ventilatoire', sub: 'Zéro hyperventilation' }, { id: 'c2a_volume', label: 'Volume d\'air', sub: 'Inspiration optimale' } ] },
+                { id: 'c2b', title: 'C2b : Immersion', short: 'C2b', icon: '🌊', criteria: [ { id: 'c2b_canard', label: 'Canard', sub: 'Vertical, jambes tendues' }, { id: 'c2b_nage', label: 'Nage', sub: 'Palmage et ondulation' }, { id: 'c2b_hydro', label: 'Hydrodynamisme', sub: 'Position, glisse, gestion effort' }, { id: 'c2b_comp', label: 'Compensation', sub: 'Efficace et sans douleur' } ] },
+                { id: 'c3', title: 'C3 : Performance', short: 'C3', icon: '⏱️', criteria: [ { id: 'c3_stat', label: 'Statique : 2 min', sub: 'Protocole sortie OK, pas de PCM' }, { id: 'c3_dyn', label: 'Dynamique : 50 m', sub: 'Protocole sortie OK, glisse' }, { id: 'c3_serie', label: 'Série : 4 x 25m', sub: 'Départ 1\'15", aisance' } ] },
+                { id: 'c4', title: 'C4 : Sécurité', short: 'C4', icon: '🆘', criteria: [ { id: 'c4_prev', label: 'Prévention', sub: 'Signes pré-syncopaux' }, { id: 'c4_rifaa', label: 'Sauvetage (RIFAA)', sub: 'Intervention, tractage, alerte' }, { id: 'c4_auto', label: 'Autonomie', sub: 'Surveillance active, consignes' }, { id: 'c4_org', label: 'Organisation', sub: 'Préparation zone (bouée...)' } ] },
+                { id: 'c5', title: 'C5 : Théorie', short: 'C5', icon: '📚', criteria: [ { id: 'c5_phys', label: 'Physique', sub: 'Pression, volumes, flottabilité' }, { id: 'c5_acc', label: 'Accidents', sub: 'Causes, symptômes, prévention' }, { id: 'c5_reg', label: 'Réglementation', sub: 'Prérogatives, autonomie' }, { id: 'c5_env', label: 'Environnement', sub: 'Respect milieu, charte' } ] }
+            ];
+
+            const [students, setStudents] = useState([]);
+            const [activeStudentId, setActiveStudentId] = useState(null);
+            const [newStudentName, setNewStudentName] = useState('');
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+            const [notification, setNotification] = useState(null);
+            const [expandedSections, setExpandedSections] = useState({});
+            const fileInputRef = useRef(null);
+
+            const showNotif = (message, type = 'success') => {
+                setNotification({ message, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            useEffect(() => {
+                try {
+                    const savedData = localStorage.getItem('apnee_app_data_v1');
+                    if (savedData) setStudents(JSON.parse(savedData));
+                } catch (e) { console.error(e); }
+            }, []);
+
+            useEffect(() => {
+                try { localStorage.setItem('apnee_app_data_v1', JSON.stringify(students)); } catch (e) {}
+            }, [students]);
+
+            const addStudent = () => {
+                if (!newStudentName.trim()) return;
+                const newStudent = { id: Date.now().toString(), name: newStudentName, evaluations: {}, notes: '', sectionNotes: {} };
+                setStudents([...students, newStudent]);
+                setNewStudentName('');
+                setShowAddModal(false);
+                setActiveStudentId(newStudent.id);
+                showNotif("Élève ajouté !");
+            };
+
+            const deleteStudent = (id) => {
+                setStudents(students.filter(s => s.id !== id));
+                if (activeStudentId === id) setActiveStudentId(null);
+                setConfirmDeleteId(null);
+                showNotif("Élève supprimé");
+            };
+
+            const updateStatus = (studentId, criteriaId, status) => {
+                setStudents(students.map(s => {
+                    if (s.id !== studentId) return s;
+                    const newEvals = { ...(s.evaluations || {}) };
+                    if (newEvals[criteriaId] === status) delete newEvals[criteriaId];
+                    else newEvals[criteriaId] = status;
+                    return { ...s, evaluations: newEvals };
+                }));
+            };
+
+            const updateNotes = (studentId, text) => {
+                setStudents(students.map(s => s.id === studentId ? { ...s, notes: text } : s));
+            };
+
+            const updateSectionNote = (studentId, sectionId, text) => {
+                setStudents(students.map(s => {
+                    if (s.id !== studentId) return s;
+                    const newSectionNotes = { ...(s.sectionNotes || {}) };
+                    newSectionNotes[sectionId] = text;
+                    return { ...s, sectionNotes: newSectionNotes };
+                }));
+            };
+
+            const exportData = () => {
+                try {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(students));
+                    const a = document.createElement('a'); a.href = dataStr;
+                    a.download = `suivi_apnee_${new Date().toISOString().slice(0,10)}.json`;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    showNotif("Sauvegarde téléchargée");
+                } catch(e) { showNotif("Erreur export", "error"); }
+            };
+
+            const handleImportFile = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const json = JSON.parse(ev.target.result);
+                        if (Array.isArray(json)) { setStudents(json); showNotif("Import réussi !"); }
+                    } catch (err) { showNotif("Fichier invalide", "error"); }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            };
+
+            const activeStudent = students.find(s => s.id === activeStudentId);
+            
+            // --- Calcul Points Globaux ---
+            const getProgress = (s) => {
+                if (!s) return 0;
+                let totalPointsPossible = 0;
+                let currentPoints = 0;
+                structure.forEach(sec => sec.criteria.forEach(c => { 
+                    totalPointsPossible += 1;
+                    const status = s.evaluations?.[c.id];
+                    if (status === 'IF') currentPoints += 0.33;
+                    else if (status === 'EP') currentPoints += 0.66;
+                    else if (status === 'A' || status === 'P') currentPoints += 1;
+                }));
+                return totalPointsPossible === 0 ? 0 : Math.round((currentPoints / totalPointsPossible) * 100);
+            };
+
+            // --- Calcul Points par Section (Nouveau) ---
+            const getSectionProgress = (s, sec) => {
+                if (!s) return 0;
+                let total = 0;
+                let points = 0;
+                sec.criteria.forEach(c => {
+                    total += 1;
+                    const st = s.evaluations?.[c.id];
+                    if (st === 'IF') points += 0.33;
+                    else if (st === 'EP') points += 0.66;
+                    else if (st === 'A' || st === 'P') points += 1;
+                });
+                return total === 0 ? 0 : Math.round((points / total) * 100);
+            };
+
+            // --- RENDER ---
+            return (
+                <div className="min-h-screen">
+                    {/* Toast */}
+                    {notification && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-medium animate-bounce ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>
+                            {notification.message}
+                        </div>
+                    )}
+
+                    {/* VUE 1 : DASHBOARD */}
+                    {!activeStudentId && (
+                        <>
+                            <header className="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10">
+                                <div className="flex justify-between items-center max-w-2xl mx-auto">
+                                    <h1 className="text-xl font-bold flex items-center gap-2">
+                                        <Icons.Award className="w-6 h-6"/> Suivi Apnée
+                                    </h1>
+                                    <div className="flex gap-2">
+                                        <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".json"/>
+                                        <button onClick={() => fileInputRef.current.click()} className="p-2 bg-blue-700 rounded-full hover:bg-blue-800"><Icons.Upload className="w-5 h-5"/></button>
+                                        <button onClick={exportData} className="p-2 bg-blue-700 rounded-full hover:bg-blue-800"><Icons.Save className="w-5 h-5"/></button>
+                                    </div>
+                                </div>
+                            </header>
+
+                            <main className="max-w-2xl mx-auto p-4 space-y-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-lg font-semibold text-slate-700">Mes Élèves ({students.length})</h2>
+                                    <button onClick={() => setShowAddModal(true)} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-bold hover:bg-green-700">
+                                        <Icons.Plus className="w-5 h-5"/> Ajouter
+                                    </button>
+                                </div>
+
+                                {students.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <div className="w-16 h-16 mx-auto mb-2 opacity-20"><Icons.User className="w-16 h-16"/></div>
+                                        <p>Aucun élève.</p>
+                                        <p className="text-sm">Ajoutez votre premier apnéiste !</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {students.map(s => {
+                                            const prog = getProgress(s);
+                                            return (
+                                                <div key={s.id} onClick={() => setActiveStudentId(s.id)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors">
+                                                    <div className="flex items-center gap-4 w-full">
+                                                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg border border-blue-200">
+                                                            {s.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            
+                                                            {/* En-tête Carte */}
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <h3 className="font-semibold text-lg truncate text-slate-800">{s.name}</h3>
+                                                                <span className="text-xs font-bold text-slate-400">{prog}%</span>
+                                                            </div>
+                                                            
+                                                            {/* Barre Globale */}
+                                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+                                                                <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${prog}%` }}/>
+                                                            </div>
+
+                                                            {/* Mini-Barres par Compétence */}
+                                                            <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+                                                                {structure.map(sec => {
+                                                                    const secProg = getSectionProgress(s, sec);
+                                                                    
+                                                                    // Couleur dynamique selon avancement
+                                                                    let barColor = "bg-blue-400";
+                                                                    if (secProg === 0) barColor = "bg-slate-200";
+                                                                    else if (secProg < 50) barColor = "bg-orange-400"; // Début
+                                                                    else if (secProg === 100) barColor = "bg-green-500"; // Fini
+
+                                                                    return (
+                                                                        <div key={sec.id} className="flex flex-col">
+                                                                            <div className="flex justify-between items-end mb-0.5">
+                                                                                <span className="text-[10px] font-bold text-slate-500 leading-none">{sec.short}</span>
+                                                                                {secProg > 0 && <span className="text-[9px] text-slate-400 leading-none">{secProg}%</span>}
+                                                                            </div>
+                                                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                                <div className={`h-full ${barColor} transition-all duration-300`} style={{ width: `${secProg}%` }}/>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                        </div>
+                                                        <Icons.ChevronRight className="text-slate-300"/>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </main>
+                        </>
+                    )}
+
+                    {/* VUE 2 : DÉTAIL */}
+                    {activeStudent && (
+                        <>
+                            <header className="bg-white border-b border-slate-200 p-4 sticky top-0 z-20 shadow-sm">
+                                <div className="max-w-2xl mx-auto flex items-center justify-between">
+                                    <button onClick={() => setActiveStudentId(null)} className="flex items-center text-slate-500 gap-1 font-medium hover:text-blue-600"><Icons.ChevronDown className="rotate-90 w-5 h-5"/> Retour</button>
+                                    <h1 className="text-lg font-bold truncate max-w-[150px]">{activeStudent.name}</h1>
+                                    <button onClick={() => setConfirmDeleteId(activeStudent.id)} className="text-red-400 p-2 hover:bg-red-50 hover:text-red-600 rounded-full"><Icons.Trash2 className="w-5 h-5"/></button>
+                                </div>
+                            </header>
+
+                            <main className="max-w-2xl mx-auto p-4 space-y-6">
+                                {/* Carte Progression Globale */}
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                                    <div className="flex justify-between items-end mb-2">
+                                        <span className="text-sm font-medium text-slate-500">Progression globale</span>
+                                        <span className="text-2xl font-bold text-blue-600">{getProgress(activeStudent)}%</span>
+                                    </div>
+                                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${getProgress(activeStudent)}%` }}/>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {structure.map(sec => {
+                                        const isExp = expandedSections[sec.id];
+                                        const total = sec.criteria.length;
+                                        const evals = activeStudent.evaluations || {};
+                                        
+                                        // Calculer si la section est finie (tout à 100%)
+                                        let validatedCount = 0;
+                                        sec.criteria.forEach(c => {
+                                            if (evals[c.id] === 'A' || evals[c.id] === 'P') validatedCount++;
+                                        });
+                                        const isDone = validatedCount === total && total > 0;
+                                        const sectionNote = activeStudent.sectionNotes?.[sec.id] || '';
+                                        const secProg = getSectionProgress(activeStudent, sec);
+                                        
+                                        return (
+                                            <div key={sec.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                                <button onClick={() => setExpandedSections(p => ({...p, [sec.id]: !p[sec.id]}))} className={`w-full p-4 flex items-center justify-between transition-colors ${isDone ? 'bg-green-50' : 'bg-white hover:bg-slate-50'}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl">{sec.icon}</span>
+                                                        <div className="text-left">
+                                                            <h3 className="font-bold text-slate-800">{sec.title}</h3>
+                                                            <div className="text-xs text-slate-500 flex items-center gap-2">
+                                                                <span className={`${secProg === 100 ? 'text-green-600 font-bold' : ''}`}>{secProg}% validé</span>
+                                                                {sectionNote && <span className="text-blue-500 font-bold flex items-center gap-1">• <Icons.MessageSquare className="w-3 h-3"/></span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {isExp ? <Icons.ChevronDown className="text-slate-400"/> : <Icons.ChevronRight className="text-slate-400"/>}
+                                                </button>
+                                                
+                                                {isExp && (
+                                                    <div className="border-t border-slate-200 bg-slate-50">
+                                                        {sec.criteria.map((crit, idx) => {
+                                                            const st = evals[crit.id];
+                                                            const isLast = idx === sec.criteria.length - 1;
+                                                            return (
+                                                                <div key={crit.id} className={`p-4 ${!isLast ? 'border-b border-slate-200' : ''}`}>
+                                                                    <div className="mb-3">
+                                                                        <div className="font-medium text-slate-800">{crit.label}</div>
+                                                                        <div className="text-xs text-slate-500">{crit.sub}</div>
+                                                                    </div>
+                                                                    
+                                                                    {/* GRILLE 4 BOUTONS */}
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <button onClick={() => updateStatus(activeStudent.id, crit.id, 'IF')} className={`py-2 rounded-lg text-xs font-bold border transition-colors ${st === 'IF' ? 'bg-slate-500 text-white border-slate-500' : 'bg-white text-slate-400 border-slate-300'}`}>
+                                                                            INITIATION
+                                                                        </button>
+                                                                        <button onClick={() => updateStatus(activeStudent.id, crit.id, 'EP')} className={`py-2 rounded-lg text-xs font-bold border transition-colors ${st === 'EP' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-400 border-slate-300'}`}>
+                                                                            PROGRES.
+                                                                        </button>
+                                                                        <button onClick={() => updateStatus(activeStudent.id, crit.id, 'A')} className={`py-2 rounded-lg text-xs font-bold border transition-colors ${st === 'A' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-400 border-slate-300'}`}>
+                                                                            ACQUIS
+                                                                        </button>
+                                                                        <button onClick={() => updateStatus(activeStudent.id, crit.id, 'P')} className={`py-2 rounded-lg text-xs font-bold border transition-colors ${st === 'P' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-400 border-slate-300'}`}>
+                                                                            PERFECT.
+                                                                        </button>
+                                                                    </div>
+
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        
+                                                        {/* Zone de Note par Compétence */}
+                                                        <div className="p-4 bg-blue-50 border-t border-blue-100">
+                                                            <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2">
+                                                                <Icons.MessageSquare className="w-4 h-4"/>
+                                                                Notes pour {sec.short}
+                                                            </label>
+                                                            <textarea 
+                                                                className="w-full p-2 border border-blue-200 rounded-lg text-sm min-h-[60px] focus:ring-1 focus:ring-blue-500 outline-none text-slate-700 bg-white" 
+                                                                placeholder={`Commentaires spécifiques à ${sec.title}...`}
+                                                                value={sectionNote}
+                                                                onChange={(e) => updateSectionNote(activeStudent.id, sec.id, e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mt-6">
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Notes Générales & Bilan</label>
+                                    <textarea 
+                                        className="w-full p-3 border border-slate-300 rounded-lg text-sm min-h-[100px] focus:ring-1 focus:ring-blue-500 outline-none" 
+                                        placeholder="Remarques générales sur l'élève..." 
+                                        value={activeStudent.notes || ''} 
+                                        onChange={(e) => updateNotes(activeStudent.id, e.target.value)}
+                                    />
+                                </div>
+                            </main>
+                        </>
+                    )}
+
+                    {/* MODAL AJOUT */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                            <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl">
+                                <h3 className="text-xl font-bold mb-4 text-slate-800">Nouvel Élève</h3>
+                                <input autoFocus type="text" placeholder="Prénom Nom" className="w-full border border-slate-300 p-3 mb-4 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 outline-none" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStudent()}/>
+                                <div className="flex justify-end gap-3">
+                                    <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">Annuler</button>
+                                    <button onClick={addStudent} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">Créer</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* MODAL SUPPRESSION */}
+                    {confirmDeleteId && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                            <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl text-center">
+                                <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><Icons.Trash2 className="w-6 h-6"/></div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Supprimer l'élève ?</h3>
+                                <p className="text-slate-500 mb-6 text-sm">Action irréversible.</p>
+                                <div className="flex justify-center gap-3">
+                                    <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">Annuler</button>
+                                    <button onClick={() => deleteStudent(confirmDeleteId)} className="px-6 py-2 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600">Supprimer</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ApneeTracker />);
+    </script>
+</body>
+</html>
